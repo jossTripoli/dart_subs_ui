@@ -48,7 +48,7 @@ def generate_subtitles():
         ffmpeg.input(filepath).output(audio_path, acodec="pcm_s16le", ac=1, ar="16k").run(quiet=True, overwrite_output=True)
 
         # Generate subtitles
-        model = whisper.load_model("small")
+        model = whisper.load_model("tiny")
         result = model.transcribe(audio_path)
 
         # Write SRT file
@@ -140,7 +140,7 @@ def generate_srt():
             ffmpeg.input(video_path).output(audio_path, acodec="pcm_s16le", ac=1, ar="16k").run(quiet=True, overwrite_output=True)
             
             # Generate subtitles
-            model = whisper.load_model("small")
+            model = whisper.load_model("tiny")
             result = model.transcribe(audio_path)
             
             # Write SRT file
