@@ -8,21 +8,10 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl">
-        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">DART Video Subtitle Generator</h1>
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Dart Video Subtitle Generator</h1>
         
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-          <p class="text-blue-700">Generate subtitles for your videos easily:</p>
-          <ol class="list-decimal list-inside mt-2 text-blue-600">
-              <li>Choose a video file (MP4, MOV, etc)</li>
-              <li>Click the "Generate Subtitles" button</li>
-              <li>Wait for the process to complete</li>
-              <li>Download your subtitled video and SRT text file</li>
-          </ol>
-        </div>
-
-
         <div id="choice-section" class="mb-6">
-            <p class="text-gray-700 mb-4">Do you already have an SRT subtitle file?</p>
+            <p class="text-gray-700 mb-4">Do you already have an SRT subtitle text file?</p>
             <div class="flex space-x-4">
                 <button id="have-srt" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300">
                     Yes, I have an SRT file
@@ -58,7 +47,7 @@
                 </label>
                 <input type="file" id="video-upload-generate-srt" name="video" accept=".mp4,.mov,.avi,.mkv" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none focus:border-blue-500" required>
             </div>
-            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-300">
+            <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-300">
                 Generate Subtitles
             </button>
         </form>
@@ -78,6 +67,9 @@
             <a id="video-download" href="#" class="block w-full text-center bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-300">
                 Download Subtitled Video
             </a>
+            <button id="generate-another" class="w-full bg-gray-500 text-white py-3 px-4 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition duration-300">
+                Generate Another
+            </button>
         </div>
     </div>
 
@@ -94,6 +86,20 @@
         const downloadLinks = document.getElementById('download-links');
         const srtDownload = document.getElementById('srt-download');
         const videoDownload = document.getElementById('video-download');
+        const generateAnother = document.getElementById('generate-another');
+
+        function showInitialState() {
+            choiceSection.classList.remove('hidden');
+            uploadFormWithSrt.classList.add('hidden');
+            uploadFormGenerateSrt.classList.add('hidden');
+            progress.classList.add('hidden');
+            downloadLinks.classList.add('hidden');
+            uploadFormWithSrt.reset();
+            uploadFormGenerateSrt.reset();
+            loadingWheel.classList.remove('hidden');
+            status.textContent = '';
+            substatus.textContent = '';
+        }
 
         haveSrtBtn.addEventListener('click', () => {
             choiceSection.classList.add('hidden');
@@ -105,12 +111,16 @@
             uploadFormGenerateSrt.classList.remove('hidden');
         });
 
+        generateAnother.addEventListener('click', showInitialState);
+
         async function handleSubmit(e, endpoint) {
             e.preventDefault();
             const formData = new FormData(e.target);
             
             progress.classList.remove('hidden');
             downloadLinks.classList.add('hidden');
+            uploadFormWithSrt.classList.add('hidden');
+            uploadFormGenerateSrt.classList.add('hidden');
             status.textContent = 'Uploading your file(s)...';
             substatus.textContent = 'This may take a few minutes depending on the file size.';
 
