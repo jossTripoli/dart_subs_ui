@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Subtitler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-md w-96">
+        <h1 class="text-2xl font-bold mb-6 text-center">Video Subtitler</h1>
+        <form id="upload-form" class="space-y-4">
+            <div>
+                <label for="file-upload" class="block text-sm font-medium text-gray-700">
+                    Choose a video file
+                </label>
+                <input type="file" id="file-upload" name="file" accept=".mp4,.mov,.avi,.mkv" class="mt-1 block w-full" required>
+            </div>
+            <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                Upload
+            </button>
+        </form>
+        <div id="progress" class="mt-4 hidden">
+            <p id="status" class="text-center text-gray-700"></p>
+            <div class="mt-2 h-2 bg-gray-200 rounded-full">
+                <div id="progress-bar" class="h-full bg-blue-500 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+        <div id="download-links" class="mt-4 space-y-2 hidden">
+            <a id="srt-download" href="#" class="block w-full text-center bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
+                Download SRT
+            </a>
+            <a id="video-download" href="#" class="block w-full text-center bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
+                Download Subtitled Video
+            </a>
+        </div>
+    </div>
+    <script>
+        const form = document.getElementById('upload-form');
+        const progress = document.getElementById('progress');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progress-bar');
+        const downloadLinks = document.getElementById('download-links');
+        const srtDownload = document.getElementById('srt-download');
+        const videoDownload = document.getElementById('video-download');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            
+            progress.classList.remove('hidden');
+            status.textContent = 'Uploading...';
+            progressBar.style.width = '0%';
+
+            try {
+                const uploadResponse = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadResult = await uploadResponse.json();
+
+                if (uploadResponse.ok) {
+                    status.textContent = 'Generating subtitles...';
+                    progressBar.style.width = '50%';
+
+                    const generateResponse = await fetch('/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ filename: uploadResult.filename })
+                    });
+                    const generateResult = await generateResponse.json();
+
+                    if (generateResponse.ok) {
+                        status.textContent = 'Subtitles generated successfully!';
+                        progressBar.style.width = '100%';
+                        downloadLinks.classList.remove('hidden');
+                        srtDownload.href = `/download/${generateResult.srt_file}`;
+                        videoDownload.href = `/download/${generateResult.video_file}`;
+                    } else {
+                        throw new Error(generateResult.error);
+                    }
+                } else {
+                    throw new Error(uploadResult.error);
+                }
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+                progressBar.style.width = '100%';
+                progressBar.classList.remove('bg-blue-500');
+                progressBar.classList.add('bg-red-500');
+            }
+        });
+    </script>
+</body>
+</html>
+
