@@ -1,8 +1,9 @@
 import os
 import tempfile
+import subprocess
+import shlex
 from flask import Flask, request, send_file, render_template, jsonify
 from werkzeug.utils import secure_filename
-import ffmpeg
 import whisper
 
 app = Flask(__name__)
@@ -11,12 +12,25 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB limit
 
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
+SUPPORTED_LANGUAGES = {
+    'eng': 'English',
+    'chi': 'Chinese',
+    'spa': 'Spanish',
+    'por': 'Portuguese',
+    'fre': 'French',
+    'ita': 'Italian',
+    'gre': 'Greek',
+    'pol': 'Polish'
+}
+
+FONT_PATH = os.path.abspath("static/fonts/NotoSansSC-Regular.ttf")
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', languages=SUPPORTED_LANGUAGES)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -45,7 +59,7 @@ def generate_subtitles():
     try:
         # Extract audio
         audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{os.path.splitext(filename)[0]}.wav")
-        ffmpeg.input(filepath).output(audio_path, acodec="pcm_s16le", ac=1, ar="16k").run(quiet=True, overwrite_output=True)
+        subprocess.run(['ffmpeg', '-y', '-i', filepath, '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', audio_path], check=True)
 
         # Generate subtitles
         model = whisper.load_model("tiny")
@@ -62,17 +76,23 @@ def generate_subtitles():
 
         # Burn subtitles into video
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{os.path.splitext(filename)[0]}_subtitled.mp4")
-        ffmpeg.concat(
-            ffmpeg.input(filepath).filter('subtitles', srt_path, force_style="OutlineColour=&H40000000,BorderStyle=3"),
-            ffmpeg.input(filepath).audio,
-            v=1, a=1
-        ).output(output_path).run(quiet=True, overwrite_output=True)
+        
+        ffmpeg_command = [
+            'ffmpeg', '-y', '-i', filepath, 
+            '-vf', f"subtitles='{shlex.quote(srt_path)}':force_style='Fontsize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H40000000,BorderStyle=3'",
+            '-c:a', 'copy',
+            '-y', output_path
+        ]
+
+        subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True)
 
         return jsonify({
             'message': 'Subtitles generated successfully',
             'srt_file': f"{os.path.splitext(filename)[0]}.srt",
             'video_file': f"{os.path.splitext(filename)[0]}_subtitled.mp4"
         })
+    except subprocess.CalledProcessError as e:
+        return jsonify({'error': f"FFmpeg error: {e.stderr}"}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -87,6 +107,7 @@ def upload_with_srt():
     
     video_file = request.files['video']
     srt_file = request.files['srt']
+    language = request.form.get('language', 'eng')
     
     if video_file.filename == '' or srt_file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -102,18 +123,23 @@ def upload_with_srt():
         srt_file.save(srt_path)
         
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{os.path.splitext(video_filename)[0]}_subtitled.mp4")
-        
+
         try:
-            ffmpeg.concat(
-                ffmpeg.input(video_path).filter('subtitles', srt_path, force_style="OutlineColour=&H40000000,BorderStyle=3"),
-                ffmpeg.input(video_path).audio,
-                v=1, a=1
-            ).output(output_path).run(quiet=True, overwrite_output=True)
+            ffmpeg_command = [
+                'ffmpeg', '-y', '-i', video_path, 
+                '-vf', f"subtitles='{shlex.quote(srt_path)}':force_style='Fontsize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H40000000,BorderStyle=3'",
+                '-c:a', 'copy',
+                '-y', output_path
+            ]
+
+            subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True)
             
             return jsonify({
                 'message': 'Video with subtitles generated successfully',
                 'video_file': f"{os.path.splitext(video_filename)[0]}_subtitled.mp4"
             })
+        except subprocess.CalledProcessError as e:
+            return jsonify({'error': f"FFmpeg error: {e.stderr}"}), 500
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
@@ -137,7 +163,7 @@ def generate_srt():
         try:
             # Extract audio
             audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{os.path.splitext(video_filename)[0]}.wav")
-            ffmpeg.input(video_path).output(audio_path, acodec="pcm_s16le", ac=1, ar="16k").run(quiet=True, overwrite_output=True)
+            subprocess.run(['ffmpeg', '-y', '-i', video_path, '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', audio_path], check=True)
             
             # Generate subtitles
             model = whisper.load_model("tiny")
@@ -154,17 +180,22 @@ def generate_srt():
             
             # Burn subtitles into video
             output_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{os.path.splitext(video_filename)[0]}_subtitled.mp4")
-            ffmpeg.concat(
-                ffmpeg.input(video_path).filter('subtitles', srt_path, force_style="OutlineColour=&H40000000,BorderStyle=3"),
-                ffmpeg.input(video_path).audio,
-                v=1, a=1
-            ).output(output_path).run(quiet=True, overwrite_output=True)
+            ffmpeg_command = [
+                'ffmpeg', '-y', '-i', video_path, 
+                '-vf', f"subtitles='{shlex.quote(srt_path)}':force_style='Fontsize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H40000000,BorderStyle=3'",
+                '-c:a', 'copy',
+                '-y', output_path
+            ]
+
+            subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True)
             
             return jsonify({
                 'message': 'Subtitles generated and video created successfully',
                 'srt_file': f"{os.path.splitext(video_filename)[0]}.srt",
                 'video_file': f"{os.path.splitext(video_filename)[0]}_subtitled.mp4"
             })
+        except subprocess.CalledProcessError as e:
+            return jsonify({'error': f"FFmpeg error: {e.stderr}"}), 500
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
